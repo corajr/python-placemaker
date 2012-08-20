@@ -42,6 +42,18 @@ class Place(object):
     def __init__(self, tree):
         self.place = tree.find('%splace' % TAG_PREFIX)
 
+        self.placeId = tree.find('%splaceId' % TAG_PREFIX).text
+        try:
+            self.placeId = int(self.placeId)
+        except ValueError:
+            pass
+
+        self.placeReferenceIds = tree.find('%splaceReferenceIds' % TAG_PREFIX).text
+        try:
+            self.placeReferenceIds = [int(x) for x in self.placeReferenceIds.split()]
+        except ValueError:
+            pass
+
         self.woeid = self.place.find('%swoeId' % TAG_PREFIX).text
         try:
             self.woeid = int(self.woeid)
@@ -129,7 +141,42 @@ class Extents(object):
         self.southwest = PlacemakerPoint(tree.find('%ssouthwest' % TAG_PREFIX))
         self.northeast = PlacemakerPoint(tree.find('%snortheast' % TAG_PREFIX))
 
+class Reference(object):
 
+    def __init__(self, tree):
+        self.woeIds = tree.find('%swoeIds' % TAG_PREFIX).text
+        try:
+            self.woeIds = self.woeIds.split()
+        except ValueError:
+            pass
+
+        self.placeReferenceId = tree.find('%splaceReferenceId' % TAG_PREFIX).text
+        try:
+            self.placeReferenceId = int(self.placeReferenceId)
+        except ValueError:
+            pass
+
+        self.placeIds = tree.find('%splaceIds' % TAG_PREFIX).text
+        try:
+            self.placeIds = [int(x) for x in self.placeIds.split()]
+        except ValueError:
+            pass
+
+        self.type = tree.find('%stype' % TAG_PREFIX).text
+
+        self.start = tree.find('%sstart' % TAG_PREFIX).text
+        try:
+            self.start = int(self.start)
+        except ValueError:
+            pass
+        self.end = tree.find('%send' % TAG_PREFIX).text
+        try:
+            self.end = int(self.end)
+        except ValueError:
+            pass
+
+    def __repr__(self):
+        return "<Placemaker Reference: '%s'>" % self.placeReferenceId
 
 class placemaker(object):
 
@@ -173,14 +220,27 @@ class placemaker(object):
         self.doc = self.tree.find('%sdocument' % TAG_PREFIX)
 
         administrative_scope_tree = self.doc.find('%sadministrativeScope' % TAG_PREFIX)
-        if administrative_scope_tree:
+        if administrative_scope_tree is not None:
             self.administrative_scope = AdministrativeScope(administrative_scope_tree)
 
         geographic_scope_tree = self.doc.find('%sgeographicScope' % TAG_PREFIX)
-        if geographic_scope_tree:
+        if geographic_scope_tree is not None:
             self.geographic_scope = GeographicScope(geographic_scope_tree)
 
         place_details = self.doc.findall('%splaceDetails' % TAG_PREFIX)
+
+        reference_list = self.doc.find('%sreferenceList' % TAG_PREFIX)
+        references = reference_list.findall('%sreference' % TAG_PREFIX)
+
         self.places = [Place(place) for place in place_details]
 
-        return self.places
+        self.references = {}
+        for reference in references:
+            r = Reference(reference)
+            self.references[r.placeReferenceId] = r
+
+        self.referencedPlaces = {}
+        for place in self.places:
+            self.referencedPlaces[place.woeid] = {"place": place, "references": [self.references[i] for i in place.placeReferenceIds]}
+
+        return self.referencedPlaces
